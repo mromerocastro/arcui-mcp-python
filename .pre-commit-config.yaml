@@ -1,0 +1,27 @@
+# Pre-commit hooks for arcui-mcp-python.
+#
+# Install once after cloning:
+#   uv sync --extra dev
+#   uv run pre-commit install
+#
+# After that, every `git commit` runs the hooks below on staged files.
+
+repos:
+  # nbstripout — strip Jupyter notebook cell outputs before commit so private
+  # paths, embedded plots, and execution metadata never leak into git history.
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.7.1
+    hooks:
+      - id: nbstripout
+        name: Strip notebook outputs
+
+  # whitespace + EOL hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]

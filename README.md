@@ -167,14 +167,33 @@ See `examples/custom_tools/drift_detector.py` for a working template that:
 - Wraps it as an MCP tool via a `register(mcp)` helper.
 - Doubles as a standalone CLI script when run directly.
 
-Wire it into the running server by editing `src/arcui_mcp/server.py`:
+**Two ways to wire it into the server:**
 
-```python
-from examples.custom_tools.drift_detector import register
-register(mcp)
+1. **Copy the function into the server (most reliable).** Open `src/arcui_mcp/server.py` and paste the `@mcp.tool()` block from `drift_detector.py` between the existing tool definitions. This works regardless of where the server is launched from.
+
+2. **Import the example as a package** (only works when the server is launched from the repo root, since `examples/` is not installed with the wheel). Add to `src/arcui_mcp/server.py`:
+
+   ```python
+   from examples.custom_tools.drift_detector import register
+   register(mcp)
+   ```
+
+   Then launch with `uv run arcui-mcp-server` from the repo root.
+
+Either way, after restart the new `detect_drift` tool becomes discoverable from Claude Desktop, Cursor, and any other connected MCP client.
+
+---
+
+## Contributing
+
+If you plan to modify the notebook or the source, install the dev hooks once:
+
+```bash
+uv sync --extra dev
+uv run pre-commit install
 ```
 
-Restart the server. The new `detect_drift` tool becomes discoverable from Claude Desktop, Cursor, and any other connected MCP client.
+This wires a pre-commit hook that strips Jupyter notebook outputs and runs basic whitespace checks on every `git commit` — so notebook execution outputs (paths, embedded data, plots) never leak into the repository's history.
 
 ---
 

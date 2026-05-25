@@ -27,6 +27,14 @@ science = [
     "jupyter>=1.0",
 ]
 
+# Install with: uv sync --extra dev
+# Tooling for contributors — pre-commit hooks that strip notebook outputs
+# and enforce basic hygiene before any commit reaches the repository.
+dev = [
+    "pre-commit>=4.0",
+    "nbstripout>=0.7",
+]
+
 [project.scripts]
 arcui-mcp-server = "arcui_mcp.server:mcp.run"
 

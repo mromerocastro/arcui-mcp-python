@@ -8,7 +8,9 @@ Claude Desktop, Cursor, Gemini, or any MCP-aware client can call by name.
 Three ways to use this file
 ---------------------------
 
-1. As a reference — read it, copy the parts you need into your own server.
+1. As a reference — read it, copy the ``@mcp.tool()`` block inside
+   ``register()`` directly into ``src/arcui_mcp/server.py``. This is the most
+   reliable wiring and works regardless of where the server is launched from.
 
 2. As a registerable module — in ``src/arcui_mcp/server.py``, after the
    ``mcp = FastMCP(...)`` line, add::
@@ -16,8 +18,9 @@ Three ways to use this file
        from examples.custom_tools.drift_detector import register
        register(mcp)
 
-   Restart the MCP server. The ``detect_drift`` tool becomes callable from any
-   MCP client connected to your bridge.
+   Then launch the server from the repository root (so ``examples`` is
+   importable). The ``examples/`` tree is not installed with the wheel, so
+   this only works in a development checkout — not after a pip install.
 
 3. As a standalone CLI — run the analysis offline without touching MCP::
 
