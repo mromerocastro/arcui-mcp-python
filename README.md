@@ -83,6 +83,7 @@ The server registers ~25 MCP tools, grouped by domain:
 | `annotate_session(label, note, author)` | Mark a meaningful moment for later review. |
 | `evaluate_session()` | Read the active session's chronological record. |
 | `send_instructor_message(text, instructor_name)` | Push a coaching message into the operator's chat (training mode only). |
+| `export_session_for_data_science(session_id)` | Convert a closed bundle into a CSV/JSON dataset package for pandas / Colab / Edge Impulse. Omit `session_id` to target the most recently closed bundle. |
 
 ### Builder
 
@@ -154,6 +155,15 @@ report.tag_summary
 `analyze` is the offline counterpart to the live `bridge`: same data model, but reads from the on-disk artifacts that survive Unity restarts. Requires the `[science]` extras (`uv sync --extra science`).
 
 See `examples/first_experiment.ipynb` for a full end-to-end walkthrough.
+
+### Two ways to consume a finished session
+
+There are two complementary paths once a session is closed — pick the one that fits the consumer:
+
+- **For Python analysis (this package).** Call `load_bundle(path)` directly. It reads the raw NDJSON in the bundle directory and returns pandas DataFrames. No intermediate format, no separate export step.
+- **For Colab notebooks or Edge Impulse uploads.** Call the `export_session_for_data_science` MCP tool — or click *Export for Data Science…* in the ArcUI Hub Recording panel — to derive a portable CSV/JSON package (`timeseries.csv`, `events.csv`, `dataset_manifest.json`, `README.md`) next to the bundle. The exporter never modifies the original bundle.
+
+Both reads can coexist on the same bundle. The MCP tool also lets a Quest 3 session ask "export this session for data science" through ARIA without anyone returning to the Unity Editor.
 
 ---
 

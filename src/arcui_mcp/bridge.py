@@ -17,7 +17,7 @@ class ArcUIBridge:
         headers = {}
         if token:
             headers["Authorization"] = f"Bearer {token}"
-            
+
         self.client = httpx.AsyncClient(timeout=10.0, headers=headers)
 
     async def _get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Any:
@@ -126,6 +126,19 @@ class ArcUIBridge:
         payload = {"label": label, "note": note, "author": author}
         return await self._post("/session/annotate", json_data=payload)
 
+    async def export_session_for_data_science(self, session_id: str = "") -> Dict[str, Any]:
+        """
+        Convert a closed session bundle into a CSV/JSON dataset package.
+
+        Pass ``session_id`` to target a specific past session, or leave it empty
+        to export the most recently closed bundle. The active session is never
+        eligible — call :py:meth:`end_session` first so the journal stops
+        appending to the bundle. The response carries the absolute paths of the
+        emitted files plus the row counts for quick sanity checks.
+        """
+        payload = {"session_id": session_id or ""}
+        return await self._post("/session/export", json_data=payload)
+
     # --- Builder Tools (Stubs for now, reflecting the Node.js implementation) ---
     async def get_protocol_config(self, industry: str, equipment: str) -> Dict[str, Any]:
         # Stubbbed implementation directly in python
@@ -150,14 +163,58 @@ class ArcUIBridge:
             parsed = json.loads(json_str)
             if not isinstance(parsed, dict):
                 errors.append("Root must be a JSON object.")
+                return {"valid": False, "errors": errors}
+
+            # 1. Validate version (v1.0 or v1.1)
+            version = parsed.get("arcui_context_version", "1.0")
+            if version not in ("1.0", "1.1"):
+                errors.append(f"Unsupported arcui_context_version: '{version}'. Must be '1.0' or '1.1'.")
+
+            # 2. Validate 'system' block
+            system = parsed.get("system")
+            if system is not None and not isinstance(system, dict):
+                errors.append("'system' must be a JSON object containing metadata.")
+            elif system is not None and not system.get("name"):
+                errors.append("Missing required field: 'system.name'.")
+
+            # 3. Validate 'tags' dictionary
+            tags = parsed.get("tags")
+            if tags is None:
+                errors.append("Missing required field: 'tags'.")
+            elif not isinstance(tags, dict):
+                errors.append("'tags' must be a JSON object (dictionary), not an array/list.")
             else:
-                if not parsed.get("system_name"):
-                    errors.append("Missing required field: 'system_name'.")
-                if not isinstance(parsed.get("tags"), list):
-                    errors.append("Missing or invalid 'tags' array.")
+                # Basic validation per tag
+                for tag_key, tag_data in tags.items():
+                    if not isinstance(tag_data, dict):
+                        errors.append(f"Tag '{tag_key}' must be a JSON object.")
+                        continue
+
+                    # If v1.1, check minimum contract requirements
+                    if version == "1.1":
+                        tag_type = tag_data.get("type")
+                        tag_role = tag_data.get("role")
+                        tag_owner = tag_data.get("owner")
+
+                        valid_types = {"float", "int", "bool", "string"}
+                        valid_roles = {"measured", "setpoint", "state"}
+
+                        if not tag_type:
+                            errors.append(f"Tag '{tag_key}': missing required contract field 'type'.")
+                        elif tag_type not in valid_types:
+                            errors.append(f"Tag '{tag_key}': invalid type '{tag_type}'. Must be one of {valid_types}.")
+
+                        if not tag_role:
+                            errors.append(f"Tag '{tag_key}': missing required contract field 'role'.")
+                        elif tag_role not in valid_roles:
+                            errors.append(f"Tag '{tag_key}': invalid role '{tag_role}'. Must be one of {valid_roles}.")
+
+                        if not tag_owner:
+                            errors.append(f"Tag '{tag_key}': missing required contract field 'owner'.")
+
         except Exception as e:
             return {"valid": False, "errors": [f"JSON parse error: {str(e)}"]}
-        
+
         return {"valid": len(errors) == 0, "errors": errors}
 
     async def generate_pilot_scope(self, vertical: str, timeline: str = "3 months") -> Dict[str, Any]:

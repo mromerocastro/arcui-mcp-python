@@ -46,9 +46,9 @@ async def get_alarm_history(limit: int = 50) -> Dict[str, Any]:
 
 @mcp.tool()
 async def trigger_alarm(
-    tag: str, 
-    level: str = "warning", 
-    message: str = "Alarm on {tag}: value = {value}", 
+    tag: str,
+    level: str = "warning",
+    message: str = "Alarm on {tag}: value = {value}",
     threshold: float = 0.0
 ) -> Dict[str, Any]:
     """
@@ -129,9 +129,9 @@ class EventModel(BaseModel):
 
 @mcp.tool()
 async def create_scenario(
-    id: str, 
-    display_name: str, 
-    description: str, 
+    id: str,
+    display_name: str,
+    description: str,
     events: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
     """
@@ -181,6 +181,20 @@ async def end_session() -> Dict[str, Any]:
 async def annotate_session(label: str, note: str = "", author: str = "mcp_remote") -> Dict[str, Any]:
     """Mark a meaningful moment on the active TrainingSession with a short label and optional free-form note."""
     return await bridge.annotate_session(label, note, author)
+
+@mcp.tool()
+async def export_session_for_data_science(session_id: str = "") -> Dict[str, Any]:
+    """
+    Export a closed session bundle as a CSV/JSON dataset package (timeseries.csv,
+    events.csv, dataset_manifest.json, README.md) ready for pandas, Colab, or
+    Edge Impulse. Pass session_id to target a specific past session, or omit
+    it to export the most recently closed bundle. The currently active session
+    is refused — call end_session first so the journal stops appending.
+    Returns absolute paths of every emitted file plus row counts.
+    Use when the user asks to "export this session for data science", "save the
+    last run as CSV", or "give me a dataset I can open in Colab".
+    """
+    return await bridge.export_session_for_data_science(session_id)
 
 
 # ==========================================
