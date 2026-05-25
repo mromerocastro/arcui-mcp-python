@@ -1,0 +1,38 @@
+[project]
+name = "arcui-mcp-python"
+version = "0.1.0"
+description = "ArcUI Spatial Digital Twin Engine - MCP Server"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Marlon Romero Castro" },
+]
+requires-python = ">=3.13"
+dependencies = [
+    "httpx>=0.28.1",
+    "mcp>=1.27.1",
+    "pydantic>=2.13.4",
+]
+
+[project.optional-dependencies]
+# Install with: uv sync --extra science
+# Brings the scientific Python stack used by the example notebook and the
+# arcui_mcp.analyze module (bundle loading, run comparison, plotting).
+# Kept optional so the bare MCP server stays small for Claude Desktop installs
+# that never touch analysis code.
+science = [
+    "pandas>=2.0",
+    "matplotlib>=3.7",
+    "jupyter>=1.0",
+]
+
+[project.scripts]
+arcui-mcp-server = "arcui_mcp.server:mcp.run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/arcui_mcp"]
