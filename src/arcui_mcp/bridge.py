@@ -89,6 +89,9 @@ class ArcUIBridge:
     async def timemachine_load_session(self, path: str) -> Dict[str, Any]:
         return await self._post("/timemachine/load", json_data={"path": path})
 
+    async def timemachine_fork(self) -> Dict[str, Any]:
+        return await self._post("/timemachine/fork")
+
     # --- Training Tools ---
     async def create_scenario(self, id: str, display_name: str, description: str, events: List[Dict[str, Any]]) -> Dict[str, Any]:
         payload = {

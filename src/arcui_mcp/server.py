@@ -116,6 +116,34 @@ async def timemachine_load_session(path: str) -> Dict[str, Any]:
     """Dynamically load a session bundle (.ndjson) into the TimeMachine for playback."""
     return await bridge.timemachine_load_session(path)
 
+@mcp.tool()
+async def timemachine_fork() -> Dict[str, Any]:
+    """
+    Branch a new live session from the current TimeMachine playback head.
+
+    Pauses playback, switches the scene to Training mode, starts a fresh
+    Session, and disconnects the TimeMachine provider so subsequent
+    widget / inject_event / MCP writes are not overwritten by the next
+    playback frame.
+
+    The new session is marked as a fork with structured provenance:
+    parent_session_id (the loaded bundle id) and fork_time_seconds (the
+    playback head when the fork happened) are recorded both on the
+    Session object and as a chronological event in its journal. The
+    DataStore cue tags System.Session.IsForked and
+    System.Session.ForkOrigin are also published so any consumer can
+    surface a "forked session" indicator.
+
+    Returns: { ok, new_session_id, parent_session_id, fork_time_seconds }
+    on success, or { error } when no Session component is in the scene.
+
+    Use when the user asks "what if we had intervened at minute X
+    instead of Y?" — fork at minute X, then drive the system manually
+    or via inject_event to capture the counterfactual run as a real,
+    auditable, replayable session.
+    """
+    return await bridge.timemachine_fork()
+
 
 # ==========================================
 # TRAINING & SCENARIO TOOLS
