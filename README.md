@@ -18,6 +18,14 @@ cd arcui-mcp-python
 uv sync
 ```
 
+Optional extras (install only what you need):
+
+```bash
+uv sync --extra science     # pandas / matplotlib / jupyter for offline analysis
+uv sync --extra knowledge   # chromadb + ollama for the Local RAG tools
+uv sync --extra dev         # pre-commit + nbstripout for contributors
+```
+
 ### 2. Run the server
 
 ```bash
@@ -47,7 +55,7 @@ If you see a health payload and a list of tags, your pipeline is live.
 
 ## Available Tools
 
-The server registers ~25 MCP tools, grouped by domain:
+The server registers ~35 MCP tools, grouped by domain:
 
 ### Operations
 
@@ -94,16 +102,51 @@ The server registers ~25 MCP tools, grouped by domain:
 | `generate_pilot_scope(vertical, timeline)` | Scope outline for a pilot deployment. |
 | `list_available_tags(vertical)` | Reference tag names for a vertical. |
 
+### Knowledge Pack — Local RAG (optional)
+
+Backed by ChromaDB (vector store) + Ollama (embeddings + generation). Local-first: documents stay on the host, no external API keys.
+
+Install the backend and turn the tools on:
+
+```bash
+uv sync --extra knowledge
+export ARCUI_ENABLE_KNOWLEDGE_TOOLS=true
+```
+
+Also start ChromaDB and Ollama locally, and pull the embedding + generation models you want to use.
+
+| Tool | Purpose |
+|---|---|
+| `knowledge_status()` | Configuration report. **Always exposed**, even when the rest of the Knowledge Pack is off — so MCP clients can discover how to enable it. |
+| `create_knowledge_store(display_name)` | Create a ChromaDB collection. |
+| `list_knowledge_stores()` | List local stores. |
+| `list_knowledge_documents(store_name)` | List the source files indexed into a store. |
+| `index_knowledge_file(path, store_name, metadata, max_tokens_per_chunk, max_overlap_tokens)` | Index one UTF-8 file. Sandboxed to `ARCUI_KNOWLEDGE_ROOTS`. |
+| `search_training_knowledge(query, store_name, instruction, model)` | Grounded answer plus per-chunk citations. |
+| `generate_grounded_scenario(request, constraints, store_name, model, register)` | Draft an ArcUI scenario grounded in the Knowledge Pack, constrained to the live tag vocabulary. Optional `register=true` pushes it to the bridge. |
+| `generate_training_debrief(request, session_json, store_name, model)` | Grounded debrief of an ArcUI session. |
+
 ---
 
 ## Configuration
 
-The server reads two environment variables:
+The server reads two environment variables for the bridge:
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `ARCUI_BRIDGE_URL` | `http://localhost:17842/mcp` | Base URL of the ArcUI Unity HTTP bridge. |
 | `ARCUI_BRIDGE_TOKEN` | (unset) | Bearer token when the bridge enables auth. |
+
+Knowledge Pack (only consumed when `ARCUI_ENABLE_KNOWLEDGE_TOOLS=true`):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `ARCUI_ENABLE_KNOWLEDGE_TOOLS` | `false` | Gate flag. Set to `true` to register the indexing / search / grounded-generation tools. |
+| `ARCUI_KNOWLEDGE_STORE` | `arcui-knowledge` | Default ChromaDB collection name. |
+| `ARCUI_KNOWLEDGE_MODEL` | `gemma` | Default Ollama generation model. |
+| `ARCUI_EMBEDDING_MODEL` | `nomic-embed-text` | Default Ollama embedding model. |
+| `CHROMA_URL` | `http://localhost:8000` | ChromaDB HTTP endpoint. |
+| `ARCUI_KNOWLEDGE_ROOTS` | `/` (no restriction) | Comma-separated directories `index_knowledge_file` is allowed to read from. |
 
 Set them in your MCP client configuration (Claude Desktop, Cursor, etc.) or in your shell when running the server directly.
 
