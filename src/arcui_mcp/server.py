@@ -1,8 +1,10 @@
+import json
 from mcp.server.fastmcp import FastMCP
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from .bridge import bridge
+from . import knowledge
 
 # Create the FastMCP server
 mcp = FastMCP("ArcUI Spatial Digital Twin Engine")
@@ -220,6 +222,174 @@ async def generate_pilot_scope(vertical: str, timeline: str = "3 months") -> Dic
 async def list_available_tags(vertical: str) -> Dict[str, Any]:
     """List tag names typically available for a given vertical."""
     return await bridge.list_available_tags(vertical)
+
+
+# ==========================================
+# KNOWLEDGE PACK TOOLS (Local RAG)
+# ==========================================
+# Backend: ChromaDB (vector store) + Ollama (embeddings + generation).
+# Local-first — no external API keys, documents never leave the host.
+#
+# Gated by ARCUI_ENABLE_KNOWLEDGE_TOOLS=true. knowledge_status is always
+# exposed so MCP clients can discover how to turn the rest on; the
+# indexing / search / grounded-generation tools register only when the
+# flag is set. Install the chromadb + ollama Python clients with:
+#     uv sync --extra knowledge
+
+@mcp.tool()
+async def knowledge_status() -> Dict[str, Any]:
+    """
+    Return ArcUI Knowledge Pack (Local RAG) configuration status.
+    Use this before indexing or querying knowledge so setup issues
+    surface explicitly. Always available, even when knowledge tools
+    are otherwise disabled — that is its job.
+    """
+    return knowledge.status()
+
+
+if knowledge.is_enabled():
+
+    @mcp.tool()
+    async def create_knowledge_store(
+        display_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a Knowledge Pack vector store (ChromaDB collection).
+        Use one store per system / equipment when possible, e.g.
+        'MQTT_Turbine' or 'Compound_Library_2026'.
+        """
+        return await knowledge.create_store(display_name=display_name)
+
+    @mcp.tool()
+    async def list_knowledge_stores() -> Dict[str, Any]:
+        """List Knowledge Pack stores available in the local ChromaDB."""
+        return await knowledge.list_stores()
+
+    @mcp.tool()
+    async def list_knowledge_documents(
+        store_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        List documents already indexed into a Knowledge Pack store.
+        Defaults to ARCUI_KNOWLEDGE_STORE when store_name is omitted.
+        """
+        return await knowledge.list_documents(store_name=store_name)
+
+    @mcp.tool()
+    async def index_knowledge_file(
+        path: str,
+        store_name: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        max_tokens_per_chunk: int = 500,
+        max_overlap_tokens: int = 50,
+    ) -> Dict[str, Any]:
+        """
+        Upload and index one local UTF-8 text document into the configured
+        Knowledge Pack store. Use for approved manuals, SOPs, protocols,
+        contracts, published papers, and scenario references. Sandboxed
+        to paths under ARCUI_KNOWLEDGE_ROOTS.
+        """
+        return await knowledge.index_file(
+            path=path,
+            store_name=store_name,
+            metadata=metadata,
+            max_tokens_per_chunk=max_tokens_per_chunk,
+            max_overlap_tokens=max_overlap_tokens,
+        )
+
+    @mcp.tool()
+    async def search_training_knowledge(
+        query: str,
+        store_name: Optional[str] = None,
+        instruction: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Ask a question grounded in the Knowledge Pack store. Returns the
+        generated answer plus per-chunk metadata (citations) from the
+        retrieved sources.
+        """
+        return await knowledge.search(
+            query=query,
+            store_name=store_name,
+            instruction=instruction,
+            model=model,
+        )
+
+    @mcp.tool()
+    async def generate_grounded_scenario(
+        request: str,
+        constraints: Optional[str] = None,
+        store_name: Optional[str] = None,
+        model: Optional[str] = None,
+        register: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Generate a draft ArcUI scenario grounded in the Knowledge Pack
+        and constrained to the live ArcUI tag vocabulary. By default
+        returns a draft for review; set register=true to also push it
+        to the running Unity bridge as a registered scenario.
+        """
+        # Pull the live tag vocabulary so the LLM stays inside it.
+        try:
+            tags_resp = await bridge.list_tags()
+            tags = (
+                tags_resp.get("tags", [])
+                if isinstance(tags_resp, dict)
+                else []
+            )
+        except Exception:  # noqa: BLE001 — best-effort enrichment
+            tags = []
+
+        result = await knowledge.generate_scenario(
+            request=request,
+            tags=tags,
+            constraints=constraints,
+            store_name=store_name,
+            model=model,
+        )
+
+        if register and isinstance(result.get("scenario"), dict):
+            scenario = result["scenario"]
+            result["registration"] = await bridge.create_scenario(
+                scenario.get("id", ""),
+                scenario.get("display_name", ""),
+                scenario.get("description", ""),
+                scenario.get("events", []),
+            )
+
+        return result
+
+    @mcp.tool()
+    async def generate_training_debrief(
+        request: str = "General performance",
+        session_json: Optional[str] = None,
+        store_name: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Generate a grounded debrief for an ArcUI session using the
+        Knowledge Pack. Reads the live Unity session via evaluate_session
+        unless session_json is provided (raw JSON string of an already
+        captured session).
+        """
+        if session_json:
+            try:
+                session = json.loads(session_json)
+            except json.JSONDecodeError as e:
+                raise ValueError(
+                    f"session_json is not valid JSON: {e}"
+                ) from e
+        else:
+            session = await bridge.evaluate_session()
+
+        return await knowledge.generate_debrief(
+            request=request,
+            session=session,
+            store_name=store_name,
+            model=model,
+        )
+
 
 if __name__ == "__main__":
     # Start the FastMCP server

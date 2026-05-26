@@ -27,6 +27,17 @@ science = [
     "jupyter>=1.0",
 ]
 
+# Install with: uv sync --extra knowledge
+# Brings the Local RAG / Knowledge Pack backend (ChromaDB vector store +
+# Ollama embeddings / generation). Off by default — set
+# ARCUI_ENABLE_KNOWLEDGE_TOOLS=true after install to expose the indexing
+# and grounded-generation tools to MCP clients. Local-first: documents
+# never leave the host and no external API keys are required.
+knowledge = [
+    "chromadb>=0.5",
+    "ollama>=0.4",
+]
+
 # Install with: uv sync --extra dev
 # Tooling for contributors — pre-commit hooks that strip notebook outputs
 # and enforce basic hygiene before any commit reaches the repository.
