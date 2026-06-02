@@ -400,10 +400,20 @@ if knowledge.is_enabled():
         model: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Generate a grounded debrief for an ArcUI session using the
-        Knowledge Pack. Reads the live Unity session via evaluate_session
-        unless session_json is provided (raw JSON string of an already
-        captured session).
+        Write an AI-authored evaluation narrative for an ArcUI session,
+        grounded in the Knowledge Pack (retrieved SOPs / manuals) and
+        returned as { debrief, sources }. This is the analytical "how well
+        did they do?" assessment.
+
+        Distinct from the debrief.html produced by
+        export_session_for_data_science, which is a deterministic, no-AI
+        "what happened?" summary file. Use that for the factual record;
+        use this for an expert, cited evaluation.
+
+        Reads the live Unity session via evaluate_session unless
+        session_json is provided (raw JSON string of an already captured
+        session) — pass session_json when debriefing a session that has
+        already ended, since evaluate_session reads the active one.
         """
         if session_json:
             try:
