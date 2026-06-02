@@ -230,6 +230,20 @@ async def export_session_for_data_science(session_id: str = "") -> Dict[str, Any
     """
     return await bridge.export_session_for_data_science(session_id)
 
+@mcp.tool()
+async def get_session_artifact_urls(session_id: str = "") -> Dict[str, Any]:
+    """
+    Return direct download URLs for a recorded session's human-readable debrief
+    (debrief.html — opens in a browser) and its full dataset ZIP, served by the
+    ArcUI bridge. Hand debrief_url to the instructor to view the visual report;
+    dataset_zip_url is the raw machine dataset. Omit session_id for the most
+    recently closed session. The URLs point at the bridge this server is
+    configured to reach and require its Authorization token when one is set.
+    Use when the user asks to "show me the session report", "give me the debrief
+    link", or "where do I download the dataset".
+    """
+    return bridge.session_artifact_urls(session_id)
+
 
 # ==========================================
 # BUILDER TOOLS

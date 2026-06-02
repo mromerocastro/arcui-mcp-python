@@ -144,6 +144,30 @@ class ArcUIBridge:
         payload = {"session_id": session_id or ""}
         return await self._post("/session/export", json_data=payload)
 
+    def session_artifact_urls(self, session_id: str = "") -> Dict[str, Any]:
+        """
+        Build direct download URLs for a recorded session's human-readable
+        ``debrief.html`` and full dataset ZIP, served by the ArcUI bridge.
+
+        Pure URL construction — no network call. The URLs point at whatever
+        bridge this client is configured to reach (``ARCUI_BRIDGE_URL``): the
+        headset over ``adb forward`` / LAN, or a local editor. The endpoints
+        themselves validate the session and return 404 if it is unknown, and
+        require the same Authorization token as every other bridge call.
+        """
+        from urllib.parse import quote
+
+        query = f"?session_id={quote(session_id)}" if session_id else ""
+        return {
+            "debrief_url": f"{self.base_url}/session/debrief{query}",
+            "dataset_zip_url": f"{self.base_url}/session/export.zip{query}",
+            "session_id": session_id or "(most recent closed session)",
+            "note": (
+                "Open debrief_url in a browser to view the visual report. "
+                "Both URLs honour the bridge Authorization token when one is set."
+            ),
+        }
+
     # --- Builder Tools (Stubs for now, reflecting the Node.js implementation) ---
     async def get_protocol_config(self, industry: str, equipment: str) -> Dict[str, Any]:
         # Stubbbed implementation directly in python

@@ -92,6 +92,7 @@ The server registers ~35 MCP tools, grouped by domain:
 | `evaluate_session()` | Read the active session's chronological record (alarms, tag changes, instructor messages, answer ratings). |
 | `send_instructor_message(text, instructor_name)` | Push a coaching message into the operator's chat (training mode only). |
 | `export_session_for_data_science(session_id)` | Convert a closed bundle into a CSV/JSON dataset package for pandas / Colab / Edge Impulse, plus a human-readable `debrief.html` summary. Omit `session_id` to target the most recently closed bundle. |
+| `get_session_artifact_urls(session_id)` | Get direct browser links to a session's debrief (`debrief.html`) and dataset ZIP, served by the bridge. Omit `session_id` for the most recent. |
 
 ### Builder
 
