@@ -89,9 +89,9 @@ The server registers ~35 MCP tools, grouped by domain:
 | `inject_event(tag_key, value_type, raw_value)` | Write a single value to a tag during a live session. |
 | `start_session(procedure)` / `end_session()` | Lifecycle of a recorded session. |
 | `annotate_session(label, note, author)` | Mark a meaningful moment for later review. |
-| `evaluate_session()` | Read the active session's chronological record. |
+| `evaluate_session()` | Read the active session's chronological record (alarms, tag changes, instructor messages, answer ratings). |
 | `send_instructor_message(text, instructor_name)` | Push a coaching message into the operator's chat (training mode only). |
-| `export_session_for_data_science(session_id)` | Convert a closed bundle into a CSV/JSON dataset package for pandas / Colab / Edge Impulse. Omit `session_id` to target the most recently closed bundle. |
+| `export_session_for_data_science(session_id)` | Convert a closed bundle into a CSV/JSON dataset package for pandas / Colab / Edge Impulse, plus a human-readable `debrief.html` summary. Omit `session_id` to target the most recently closed bundle. |
 
 ### Builder
 
@@ -205,6 +205,7 @@ There are two complementary paths once a session is closed — pick the one that
 
 - **For Python analysis (this package).** Call `load_bundle(path)` directly. It reads the raw NDJSON in the bundle directory and returns pandas DataFrames. No intermediate format, no separate export step.
 - **For Colab notebooks or Edge Impulse uploads.** Call the `export_session_for_data_science` MCP tool — or click *Export for Data Science…* in the ArcUI Hub Recording panel — to derive a portable CSV/JSON package (`timeseries.csv`, `events.csv`, `dataset_manifest.json`, `README.md`) next to the bundle. The exporter never modifies the original bundle.
+- **For a person to read.** The same export also writes `debrief.html` — a self-contained, plain-language summary of the session (answer ratings, alarms, a timeline) that opens in any browser. Its path is returned as `debrief_path`. This is the human layer; the CSV/JSON above is the machine layer.
 
 Both reads can coexist on the same bundle. The MCP tool also lets a Quest 3 session ask "export this session for data science" through ARIA without anyone returning to the Unity Editor.
 

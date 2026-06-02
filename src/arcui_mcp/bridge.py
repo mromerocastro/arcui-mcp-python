@@ -137,7 +137,9 @@ class ArcUIBridge:
         to export the most recently closed bundle. The active session is never
         eligible — call :py:meth:`end_session` first so the journal stops
         appending to the bundle. The response carries the absolute paths of the
-        emitted files plus the row counts for quick sanity checks.
+        emitted files plus the row counts for quick sanity checks; this includes
+        ``debrief_path``, a human-readable ``debrief.html`` summary intended for
+        an instructor or reviewer (the machine-readable CSV/JSON sit alongside).
         """
         payload = {"session_id": session_id or ""}
         return await self._post("/session/export", json_data=payload)

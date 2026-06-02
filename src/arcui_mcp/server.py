@@ -189,7 +189,7 @@ async def inject_event(tag_key: str, value_type: str, raw_value: str) -> Dict[st
 
 @mcp.tool()
 async def evaluate_session() -> Dict[str, Any]:
-    """Read the active TrainingSession's chronological record: alarm activations, acknowledgements, and tag changes."""
+    """Read the active TrainingSession's chronological record: alarm activations, acknowledgements, tag changes, instructor messages, and ARIA answer ratings (helpful / needs-work)."""
     return await bridge.evaluate_session()
 
 @mcp.tool()
@@ -217,12 +217,16 @@ async def export_session_for_data_science(session_id: str = "") -> Dict[str, Any
     """
     Export a closed session bundle as a CSV/JSON dataset package (timeseries.csv,
     events.csv, dataset_manifest.json, README.md) ready for pandas, Colab, or
-    Edge Impulse. Pass session_id to target a specific past session, or omit
-    it to export the most recently closed bundle. The currently active session
-    is refused — call end_session first so the journal stops appending.
+    Edge Impulse. Also writes a human-readable debrief.html — a plain-language
+    summary (answer ratings, alarms, timeline) for an instructor or reviewer to
+    open in any browser; its path is returned as debrief_path. Pass session_id
+    to target a specific past session, or omit it to export the most recently
+    closed bundle. The currently active session is refused — call end_session
+    first so the journal stops appending.
     Returns absolute paths of every emitted file plus row counts.
     Use when the user asks to "export this session for data science", "save the
-    last run as CSV", or "give me a dataset I can open in Colab".
+    last run as CSV", "give me a dataset I can open in Colab", or "show me a
+    readable summary / debrief of the session".
     """
     return await bridge.export_session_for_data_science(session_id)
 
