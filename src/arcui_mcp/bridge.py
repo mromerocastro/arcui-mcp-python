@@ -1,9 +1,19 @@
+import asyncio
 import httpx
 import logging
 import os
+import uuid
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+# Retry policy for transient failures. Mutable POSTs are made replay-safe by an
+# X-Idempotency-Key header (the bridge executes the first delivery and replays
+# its cached response for any retry carrying the same key), so a lost response
+# can be retried without duplicating a command against the ArcUI runtime. GETs
+# are naturally idempotent and reuse the same path.
+_MAX_ATTEMPTS = 3
+_RETRY_BASE_DELAY_SECONDS = 0.25
 
 class ArcUIBridge:
     """
@@ -11,40 +21,90 @@ class ArcUIBridge:
     Assumes the ArcUI runtime is up and listening on localhost:17842 by default.
     Override with the ARCUI_BRIDGE_URL environment variable.
     """
-    def __init__(self, base_url: str = "http://localhost:17842/mcp"):
+    def __init__(
+        self,
+        base_url: str = "http://localhost:17842/mcp",
+        transport: Optional[httpx.AsyncBaseTransport] = None,
+    ):
         self.base_url = os.getenv("ARCUI_BRIDGE_URL", base_url).rstrip("/")
         token = os.getenv("ARCUI_BRIDGE_TOKEN", "")
         headers = {}
         if token:
             headers["Authorization"] = f"Bearer {token}"
 
-        self.client = httpx.AsyncClient(timeout=10.0, headers=headers)
+        # ``transport`` is an injection seam for tests (e.g. httpx.MockTransport);
+        # it is None in normal use, leaving httpx to pick its default transport.
+        self.client = httpx.AsyncClient(timeout=10.0, headers=headers, transport=transport)
+
+    async def _request(
+        self,
+        method: str,
+        endpoint: str,
+        params: Optional[Dict[str, Any]] = None,
+        json_data: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """
+        Issue a request to the bridge with idempotent, transient-failure retries.
+
+        A POST carries one ``X-Idempotency-Key`` generated per logical call and
+        reused across every retry, so the bridge collapses duplicate deliveries
+        into a single execution. Retries fire only on transport-level failures
+        (a lost/dropped response) and on HTTP 409 (an identical request still in
+        flight on the bridge); genuine HTTP errors are surfaced, not retried.
+        """
+        url = f"{self.base_url}/{endpoint.lstrip('/')}"
+
+        request_headers: Optional[Dict[str, str]] = None
+        if method == "POST":
+            request_headers = {"X-Idempotency-Key": str(uuid.uuid4())}
+
+        last_error: Optional[Exception] = None
+        for attempt in range(1, _MAX_ATTEMPTS + 1):
+            try:
+                response = await self.client.request(
+                    method, url, params=params, json=json_data, headers=request_headers
+                )
+
+                # 409 means an identical request (same idempotency key) is still
+                # being processed. Back off and retry; the retry replays the
+                # cached result once the in-flight call completes.
+                if response.status_code == 409 and attempt < _MAX_ATTEMPTS:
+                    await asyncio.sleep(_RETRY_BASE_DELAY_SECONDS * attempt)
+                    continue
+
+                response.raise_for_status()
+                return response.json()
+
+            except httpx.HTTPStatusError as e:
+                # The bridge answered with a real error (4xx/5xx). Not retried —
+                # the decision is final and the body is meaningful to relay.
+                logger.error(f"HTTP error from Unity Bridge: {e.response.text}")
+                raise RuntimeError(f"ArcUI Bridge error: {e.response.text}")
+
+            except httpx.TransportError as e:
+                # The response was lost in transit (connection dropped/timeout).
+                # Safe to retry: GETs are idempotent and POSTs carry a stable
+                # idempotency key, so a re-send cannot duplicate a command.
+                last_error = e
+                if attempt < _MAX_ATTEMPTS:
+                    logger.warning(
+                        f"Transient bridge error on {method} {url} "
+                        f"(attempt {attempt}/{_MAX_ATTEMPTS}): {e}. Retrying."
+                    )
+                    await asyncio.sleep(_RETRY_BASE_DELAY_SECONDS * attempt)
+                    continue
+                break
+
+        logger.error(f"Connection error to Unity Bridge: {last_error}")
+        raise RuntimeError(
+            f"Failed to connect to ArcUI Unity Bridge at {url}. Is Unity running?"
+        )
 
     async def _get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Any:
-        url = f"{self.base_url}/{endpoint.lstrip('/')}"
-        try:
-            response = await self.client.get(url, params=params)
-            response.raise_for_status()
-            return response.json()
-        except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error from Unity Bridge: {e.response.text}")
-            raise RuntimeError(f"ArcUI Bridge error: {e.response.text}")
-        except Exception as e:
-            logger.error(f"Connection error to Unity Bridge: {str(e)}")
-            raise RuntimeError(f"Failed to connect to ArcUI Unity Bridge at {url}. Is Unity running?")
+        return await self._request("GET", endpoint, params=params)
 
     async def _post(self, endpoint: str, json_data: Optional[Dict[str, Any]] = None) -> Any:
-        url = f"{self.base_url}/{endpoint.lstrip('/')}"
-        try:
-            response = await self.client.post(url, json=json_data)
-            response.raise_for_status()
-            return response.json()
-        except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error from Unity Bridge: {e.response.text}")
-            raise RuntimeError(f"ArcUI Bridge error: {e.response.text}")
-        except Exception as e:
-            logger.error(f"Connection error to Unity Bridge: {str(e)}")
-            raise RuntimeError(f"Failed to connect to ArcUI Unity Bridge at {url}. Is Unity running?")
+        return await self._request("POST", endpoint, json_data=json_data)
 
     # --- Operations Tools ---
     async def get_tag(self, key: str) -> Dict[str, Any]:
@@ -167,6 +227,48 @@ class ArcUIBridge:
                 "Both URLs honour the bridge Authorization token when one is set."
             ),
         }
+
+    # --- Continuity / Carryover Tools ---
+    async def get_carryover(self, equipment_id: str, procedure: str) -> Dict[str, Any]:
+        return await self._get(
+            "/carryover",
+            params={"equipment_id": equipment_id, "procedure": procedure},
+        )
+
+    async def get_carryover_material(
+        self, equipment_id: str, procedure: str, session_id: str = ""
+    ) -> Dict[str, Any]:
+        params = {"equipment_id": equipment_id, "procedure": procedure}
+        if session_id:
+            params["session_id"] = session_id
+        return await self._get("/carryover/material", params=params)
+
+    async def confirm_carryover(
+        self,
+        equipment_id: str,
+        procedure: str,
+        summary: str,
+        open_items: Optional[List[Dict[str, Any]]] = None,
+        watch_items: Optional[List[Dict[str, Any]]] = None,
+        key_annotations: Optional[List[str]] = None,
+        unresolved_alarms: Optional[List[str]] = None,
+        source_session_id: str = "",
+        author: str = "",
+    ) -> Dict[str, Any]:
+        payload = {
+            "equipment_id": equipment_id,
+            "procedure": procedure,
+            "summary": summary,
+            "open_items": open_items or [],
+            "watch_items": watch_items or [],
+            "key_annotations": key_annotations or [],
+            "unresolved_alarms": unresolved_alarms or [],
+            "source_session_id": source_session_id,
+            "author": author,
+        }
+        # _post attaches an X-Idempotency-Key, so a retried confirm cannot
+        # write a duplicate handover record.
+        return await self._post("/carryover/confirm", json_data=payload)
 
     # --- Builder Tools (Stubs for now, reflecting the Node.js implementation) ---
     async def get_protocol_config(self, industry: str, equipment: str) -> Dict[str, Any]:

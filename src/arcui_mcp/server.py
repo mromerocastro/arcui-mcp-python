@@ -246,6 +246,87 @@ async def get_session_artifact_urls(session_id: str = "") -> Dict[str, Any]:
 
 
 # ==========================================
+# CONTINUITY (CROSS-SESSION HANDOVER) TOOLS
+# ==========================================
+# A "carryover" is a shift-handover note for one piece of equipment running a
+# given procedure (e.g. equipment_id="wind-turbine-07", procedure="startup").
+# It lets the next session pick up where the last one left off: a short summary,
+# items still open, and things to watch. Training mode only. The note is a
+# human-confirmed record (the AI drafts, a person approves) and never changes
+# any live value.
+
+@mcp.tool()
+async def get_carryover(equipment_id: str, procedure: str) -> Dict[str, Any]:
+    """
+    Fetch the latest confirmed handover note for a piece of equipment running a
+    given procedure, so a new session can start from where the previous one
+    ended. Call this at the START of a session to surface what was left open.
+
+    Returns { active: true, carryover: {...} } when a note exists, or
+    { active: false, continuity_key } when this is the first session.
+    Examples: equipment_id="wind-turbine-07", procedure="startup";
+    equipment_id="ward-3-infusion-pump", procedure="priming".
+    Training mode only.
+    """
+    return await bridge.get_carryover(equipment_id, procedure)
+
+
+@mcp.tool()
+async def get_carryover_material(
+    equipment_id: str, procedure: str, session_id: str = ""
+) -> Dict[str, Any]:
+    """
+    Gather the raw material for DRAFTING a handover note after a session closes:
+    the previous note's still-open items (to carry forward) and a snapshot of
+    alarms still active. Read-only — it writes nothing.
+
+    Typical flow at the END of a session: call this, then write a short summary
+    and an open_items list yourself, show it to the human for approval, and
+    finally call confirm_carryover with the approved content. Omit session_id to
+    target the most recently closed session. Training mode only.
+    """
+    return await bridge.get_carryover_material(equipment_id, procedure, session_id)
+
+
+@mcp.tool()
+async def confirm_carryover(
+    equipment_id: str,
+    procedure: str,
+    summary: str,
+    open_items: Optional[List[Dict[str, Any]]] = None,
+    watch_items: Optional[List[Dict[str, Any]]] = None,
+    key_annotations: Optional[List[str]] = None,
+    unresolved_alarms: Optional[List[str]] = None,
+    source_session_id: str = "",
+    author: str = "",
+) -> Dict[str, Any]:
+    """
+    Save a human-confirmed handover note so the next session on this equipment +
+    procedure can read it. Only call this after a person has reviewed the
+    content — the human owns the decision; the AI only proposes (HITL).
+
+    'open_items' is a list of dicts, each like
+    {"id": "i1", "text": "recheck seal torque", "priority": "high",
+     "status": "open"}; carry an unresolved item forward by keeping its id and
+    status "carried", close it with status "resolved". 'watch_items' are dicts
+    {"tag": "...", "note": "..."} for things to monitor (reference only, never
+    written). The note is stored append-only — every confirm is a new version,
+    the full history is kept. Training mode only.
+    """
+    return await bridge.confirm_carryover(
+        equipment_id=equipment_id,
+        procedure=procedure,
+        summary=summary,
+        open_items=open_items,
+        watch_items=watch_items,
+        key_annotations=key_annotations,
+        unresolved_alarms=unresolved_alarms,
+        source_session_id=source_session_id,
+        author=author,
+    )
+
+
+# ==========================================
 # BUILDER TOOLS
 # ==========================================
 

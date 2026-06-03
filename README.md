@@ -55,7 +55,7 @@ If you see a health payload and a list of tags, your pipeline is live.
 
 ## Available Tools
 
-The server registers ~35 MCP tools, grouped by domain:
+The server registers ~38 MCP tools, grouped by domain:
 
 ### Operations
 
@@ -93,6 +93,16 @@ The server registers ~35 MCP tools, grouped by domain:
 | `send_instructor_message(text, instructor_name)` | Push a coaching message into the operator's chat (training mode only). |
 | `export_session_for_data_science(session_id)` | Convert a closed bundle into a CSV/JSON dataset package for pandas / Colab / Edge Impulse, plus a human-readable `debrief.html` summary. Omit `session_id` to target the most recently closed bundle. |
 | `get_session_artifact_urls(session_id)` | Get direct browser links to a session's debrief (`debrief.html`) and dataset ZIP, served by the bridge. Omit `session_id` for the most recent. |
+
+### Continuity (cross-session handover)
+
+Pick up where the last session left off. A *carryover* is a handover note for one `equipment_id` + `procedure` (e.g. `wind-turbine-07` / `startup`): a short summary, items still open, things to watch. The AI drafts it; a human confirms it (it never changes any live value). Training mode only.
+
+| Tool | Purpose |
+|---|---|
+| `get_carryover(equipment_id, procedure)` | Latest confirmed handover note for this equipment + procedure. Call at session start. |
+| `get_carryover_material(equipment_id, procedure, session_id)` | Read-only material for drafting a note at session close: prior open items + active-alarm snapshot. |
+| `confirm_carryover(equipment_id, procedure, summary, open_items, …)` | Save a human-confirmed note. Append-only, full history kept; retry-safe via idempotency key. |
 
 ### Builder
 
