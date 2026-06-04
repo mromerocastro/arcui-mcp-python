@@ -72,6 +72,8 @@ The server registers ~38 MCP tools, grouped by domain:
 
 ### TimeMachine (replay historical telemetry)
 
+> On the product site this capability is called **Session Replay** — same engine, same tools (all prefixed `timemachine_`).
+
 | Tool | Purpose |
 |---|---|
 | `timemachine_play()` / `timemachine_pause()` | Resume / pause replay. |
