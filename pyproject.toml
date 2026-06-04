@@ -48,6 +48,9 @@ dev = [
 
 [project.scripts]
 arcui-mcp-server = "arcui_mcp.server:mcp.run"
+# Local-first HTTP retrieval endpoint for device-side clients (off unless
+# ARCUI_ENABLE_KNOWLEDGE_TOOLS=true). See arcui_mcp.knowledge_server.
+arcui-knowledge-server = "arcui_mcp.knowledge_server:main"
 
 [build-system]
 requires = ["hatchling"]

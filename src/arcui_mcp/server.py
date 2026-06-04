@@ -444,6 +444,25 @@ if knowledge.is_enabled():
         )
 
     @mcp.tool()
+    async def retrieve_training_knowledge(
+        query: str,
+        store_name: Optional[str] = None,
+        n_results: int = 5,
+    ) -> Dict[str, Any]:
+        """
+        Retrieve grounding passages from the Knowledge Pack WITHOUT LLM
+        generation. Returns the top matching chunks plus per-chunk citation
+        metadata, leaving answer synthesis (and grounded-or-silent refusal) to
+        the caller. Use when the caller is itself the LLM voice and only needs
+        cited source passages — e.g. an in-headset assistant grounding its own
+        answer. For a finished, generated answer instead, use
+        search_training_knowledge.
+        """
+        return await knowledge.retrieve(
+            query=query, store_name=store_name, n_results=n_results
+        )
+
+    @mcp.tool()
     async def generate_grounded_scenario(
         request: str,
         constraints: Optional[str] = None,

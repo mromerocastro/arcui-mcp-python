@@ -289,6 +289,62 @@ async def search(
     return {"text": response["response"], "grounding": metas}
 
 
+def retrieve_sync(
+    query: str,
+    store_name: Optional[str] = None,
+    n_results: int = 5,
+) -> Dict[str, Any]:
+    """Retrieve grounding passages WITHOUT LLM generation (synchronous).
+
+    Returns the top matching chunks plus per-chunk citation metadata and a
+    similarity distance, leaving answer synthesis to the caller. This is the
+    path used by a caller that is itself the LLM voice (e.g. ARIA in Unity):
+    it applies its own grounded-or-silent policy and cites the returned
+    sources, so no second generation happens here.
+
+    Distinct from :func:`search`, which also runs an Ollama generation pass
+    and returns a finished answer.
+    """
+    name = store_name or _default_store()
+    client = _chroma()
+    collection = client.get_collection(name=name)
+    embedding = _embed(query)
+    results = collection.query(
+        query_embeddings=[embedding],
+        n_results=max(1, n_results),
+        include=["documents", "metadatas", "distances"],
+    )
+
+    docs = (results.get("documents") or [[]])[0]
+    metas = (results.get("metadatas") or [[]])[0]
+    dists = (results.get("distances") or [[]])[0]
+
+    matches: List[Dict[str, Any]] = []
+    for i, text in enumerate(docs):
+        meta = metas[i] if i < len(metas) else {}
+        if not isinstance(meta, dict):
+            meta = {}
+        matches.append(
+            {
+                "text": text,
+                "source": meta.get("source"),
+                "metadata": meta,
+                "distance": dists[i] if i < len(dists) else None,
+            }
+        )
+
+    return {"matches": matches, "store": name, "query": query}
+
+
+async def retrieve(
+    query: str,
+    store_name: Optional[str] = None,
+    n_results: int = 5,
+) -> Dict[str, Any]:
+    """Async wrapper over :func:`retrieve_sync` for MCP tool parity."""
+    return retrieve_sync(query, store_name=store_name, n_results=n_results)
+
+
 async def generate_scenario(
     request: str,
     tags: Optional[List[Any]] = None,
