@@ -1,7 +1,7 @@
 """
 ArcUI Knowledge Pack — Local RAG over approved documents.
 
-Port of the Node connector's ``local-knowledge-search.js`` to Python so
+Implemented in Python so
 the knowledge tools live in the same ecosystem the scientific Python
 community already uses (chromadb, ollama, pandas, jupyter).
 
@@ -28,7 +28,7 @@ Sandboxing
 ----------
 ``ARCUI_KNOWLEDGE_ROOTS`` accepts a comma-separated list of directories.
 ``index_file`` refuses any path outside those roots. Default is ``/``
-(no restriction), which is the same behaviour the Node port shipped.
+(no restriction).
 """
 
 from __future__ import annotations
@@ -107,7 +107,7 @@ def _ollama():
 
 
 def _chunk_text(text: str, max_tokens: int = 500, overlap: int = 50) -> List[str]:
-    """Word-based chunking. Same heuristic as the Node port."""
+    """Word-based chunking."""
     words = text.split()
     chunks: List[str] = []
     step = max(1, max_tokens - overlap)

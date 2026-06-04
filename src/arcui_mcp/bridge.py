@@ -270,7 +270,7 @@ class ArcUIBridge:
         # write a duplicate handover record.
         return await self._post("/carryover/confirm", json_data=payload)
 
-    # --- Builder Tools (Stubs for now, reflecting the Node.js implementation) ---
+    # --- Builder Tools (stubs for now) ---
     async def get_protocol_config(self, industry: str, equipment: str) -> Dict[str, Any]:
         # Stubbbed implementation directly in python
         catalog = {
