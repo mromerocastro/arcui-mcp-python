@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
@@ -143,6 +144,55 @@ def _resolve_within_roots(path: str) -> Path:
     return file_path
 
 
+# Common inline-LaTeX → Unicode, so academic-PDF manuals (papers, theses)
+# read cleanly in the operator panel instead of showing raw "$\dot{Q}$" markup.
+_LATEX_SYMBOLS = {
+    r"\alpha": "α", r"\beta": "β", r"\gamma": "γ", r"\delta": "δ",
+    r"\varepsilon": "ε", r"\epsilon": "ε", r"\zeta": "ζ", r"\eta": "η",
+    r"\theta": "θ", r"\kappa": "κ", r"\lambda": "λ", r"\mu": "μ", r"\nu": "ν",
+    r"\xi": "ξ", r"\rho": "ρ", r"\sigma": "σ", r"\tau": "τ", r"\varphi": "φ",
+    r"\phi": "φ", r"\chi": "χ", r"\psi": "ψ", r"\omega": "ω", r"\pi": "π",
+    r"\Delta": "Δ", r"\Sigma": "Σ", r"\Omega": "Ω", r"\Phi": "Φ",
+    r"\partial": "∂", r"\nabla": "∇", r"\infty": "∞", r"\sqrt": "√",
+    r"\times": "×", r"\cdot": "·", r"\pm": "±", r"\mp": "∓",
+    r"\leq": "≤", r"\geq": "≥", r"\neq": "≠", r"\approx": "≈",
+    r"\rightarrow": "→", r"\Rightarrow": "⇒", r"\circ": "°", r"\degree": "°",
+}
+
+
+def _clean_latex(text: str) -> str:
+    """Best-effort conversion of inline LaTeX math (common in academic PDFs) to
+    plain, operator-readable text. NOT a full LaTeX engine: it maps frequent
+    Greek letters / symbols to Unicode, unwraps simple accents, \\text{} and
+    sub/superscripts, then strips leftover $ delimiters, braces and
+    backslash-commands. Goal is a readable manual citation, not typeset math.
+    """
+    if not text:
+        return text
+
+    # \text{...}, \mathrm{...}, \mathbf{...} → their content
+    text = re.sub(r"\\(?:text|mathrm|mathbf|mathit|operatorname)\{([^{}]*)\}", r"\1", text)
+    # accents \dot{Q} \hat{x} \bar{y} → inner symbol (accent dropped)
+    text = re.sub(r"\\(?:dot|ddot|hat|bar|vec|tilde)\{([^{}]*)\}", r"\1", text)
+    # degree: ^\circ → °
+    text = re.sub(r"\^\s*\\circ", "°", text)
+    # sub/superscripts → inline content, dropping the ^ _ markers and braces
+    text = re.sub(r"[\^_]\{([^{}]*)\}", r"\1", text)
+    text = re.sub(r"[\^_]([A-Za-z0-9])", r"\1", text)
+    # known symbol commands → Unicode (longest first, so \varepsilon beats \epsilon)
+    for cmd in sorted(_LATEX_SYMBOLS, key=len, reverse=True):
+        text = text.replace(cmd, _LATEX_SYMBOLS[cmd])
+    # LaTeX line break "\\" → space
+    text = text.replace("\\\\", " ")
+    # strip any remaining \command tokens (\frac, \left, \right, …)
+    text = re.sub(r"\\[A-Za-z]+", "", text)
+    # drop the $ math delimiters and now-orphan braces
+    text = text.replace("$", "").replace("{", "").replace("}", "")
+    # tidy doubled spaces introduced by the removals
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text
+
+
 def _extract_pdf_text(file_path: Path) -> str:
     """Extract text from a PDF with pypdf.
 
@@ -166,7 +216,7 @@ def _extract_pdf_text(file_path: Path) -> str:
             f"No extractable text found in {file_path.name}. It may be a scanned "
             "/ image-only PDF, which needs OCR (not supported)."
         )
-    return text
+    return _clean_latex(text)
 
 
 def _read_document_text(file_path: Path) -> str:
