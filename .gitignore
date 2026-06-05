@@ -30,5 +30,11 @@ Thumbs.db
 test.png
 *.tmp
 
+# Local Knowledge Pack runtime data + ad-hoc indexing scripts.
+# chroma/ is the on-disk ChromaDB store; index_*.py are personal helper
+# scripts that often hardcode machine-local document paths — never commit.
+chroma/
+index_*.py
+
 # Jupyter checkpoints
 .ipynb_checkpoints/
