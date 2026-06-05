@@ -33,6 +33,7 @@ Sandboxing
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -307,8 +308,20 @@ async def index_file(
     client = _chroma()
     collection = client.get_or_create_collection(name=name)
 
+    source = str(file_path)
     base_meta: Dict[str, Any] = dict(metadata or {})
-    base_meta["source"] = str(file_path)
+    base_meta["source"] = source
+
+    # Make (re-)indexing idempotent: drop any chunks previously indexed from this
+    # same source before inserting the new ones, so re-running index_file on a
+    # document REPLACES it cleanly — no duplicates, and no stale chunks lingering
+    # when the new version is shorter. Other documents are untouched (the filter
+    # is scoped to this source). A no-op for a source that was never indexed.
+    collection.delete(where={"source": source})
+
+    # IDs are derived from the full source path (not just the file name), so two
+    # different files that happen to share a name never collide.
+    source_id = hashlib.sha1(source.encode("utf-8")).hexdigest()[:12]
 
     ids: List[str] = []
     documents: List[str] = []
@@ -316,7 +329,7 @@ async def index_file(
     metadatas: List[Dict[str, Any]] = []
 
     for i, chunk in enumerate(chunks):
-        ids.append(f"{file_path.name}-chunk-{i}")
+        ids.append(f"{source_id}-chunk-{i}")
         documents.append(chunk)
         embeddings.append(_embed(chunk))
         metadatas.append({**base_meta, "chunk_index": i})
