@@ -411,10 +411,11 @@ if knowledge.is_enabled():
         max_overlap_tokens: int = 50,
     ) -> Dict[str, Any]:
         """
-        Upload and index one local UTF-8 text document into the configured
-        Knowledge Pack store. Use for approved manuals, SOPs, protocols,
-        contracts, published papers, and scenario references. Sandboxed
-        to paths under ARCUI_KNOWLEDGE_ROOTS.
+        Upload and index one local document into the configured Knowledge Pack
+        store. Accepts UTF-8 text or a text-based PDF (parsed with pypdf;
+        scanned/image-only PDFs need OCR and are not supported). Use for approved
+        manuals, SOPs, protocols, contracts, published papers, and scenario
+        references. Sandboxed to paths under ARCUI_KNOWLEDGE_ROOTS.
         """
         return await knowledge.index_file(
             path=path,

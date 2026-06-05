@@ -36,6 +36,7 @@ science = [
 knowledge = [
     "chromadb>=0.5",
     "ollama>=0.4",
+    "pypdf>=4.0",
 ]
 
 # Install with: uv sync --extra dev

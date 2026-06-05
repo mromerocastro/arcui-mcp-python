@@ -143,6 +143,40 @@ def _resolve_within_roots(path: str) -> Path:
     return file_path
 
 
+def _extract_pdf_text(file_path: Path) -> str:
+    """Extract text from a PDF with pypdf.
+
+    Text-based PDFs only. Scanned / image-only PDFs yield little or no
+    extractable text and would need OCR, which is intentionally out of scope —
+    the function raises a clear error in that case rather than indexing empty
+    pages.
+    """
+    try:
+        from pypdf import PdfReader  # type: ignore
+    except ImportError as e:  # pragma: no cover - dependency hint
+        raise RuntimeError(
+            "Indexing a PDF needs the 'pypdf' package. Install the knowledge "
+            "extras: uv sync --extra knowledge"
+        ) from e
+
+    reader = PdfReader(str(file_path))
+    text = "\n".join((page.extract_text() or "") for page in reader.pages).strip()
+    if not text:
+        raise RuntimeError(
+            f"No extractable text found in {file_path.name}. It may be a scanned "
+            "/ image-only PDF, which needs OCR (not supported)."
+        )
+    return text
+
+
+def _read_document_text(file_path: Path) -> str:
+    """Read a document as UTF-8 text. ``.pdf`` files are parsed with pypdf;
+    everything else is read as UTF-8 text directly."""
+    if file_path.suffix.lower() == ".pdf":
+        return _extract_pdf_text(file_path)
+    return file_path.read_text(encoding="utf-8")
+
+
 # ─── Public API ───────────────────────────────────────────────────────────────
 
 
@@ -217,7 +251,7 @@ async def index_file(
     name = store_name or _default_store()
     file_path = _resolve_within_roots(path)
 
-    text = file_path.read_text(encoding="utf-8")
+    text = _read_document_text(file_path)
     chunks = _chunk_text(text, max_tokens_per_chunk, max_overlap_tokens)
 
     client = _chroma()
