@@ -213,6 +213,25 @@ async def annotate_session(label: str, note: str = "", author: str = "mcp_remote
     return await bridge.annotate_session(label, note, author)
 
 @mcp.tool()
+async def set_operational_mode(mode: str, bundle: str = "", confirm: bool = False) -> Dict[str, Any]:
+    """
+    Switch the running scene between operational modes at runtime — no recompile,
+    no headset removal. The instructor drives this remotely.
+
+    mode:
+      - "training": enter the simulated training sandbox (safe).
+      - "replay":  review a recording. Optionally pass `bundle` (a recording path)
+                   to load one before playing.
+      - "live":    real operations. DOUBLE-LOCKED for safety — the deployment must
+                   allow live switching AND you must resend with confirm=true. The
+                   first call returns { ok: false, requires_confirmation: true }.
+
+    Returns { ok: true, mode, message } on success, or
+    { ok: false, requires_confirmation, error } when gated or refused.
+    """
+    return await bridge.set_operational_mode(mode, bundle, confirm)
+
+@mcp.tool()
 async def export_session_for_data_science(session_id: str = "") -> Dict[str, Any]:
     """
     Export a closed session bundle as a CSV/JSON dataset package (timeseries.csv,

@@ -185,6 +185,14 @@ class ArcUIBridge:
     async def end_session(self) -> Dict[str, Any]:
         return await self._post("/session/end")
 
+    async def set_operational_mode(self, mode: str, bundle: str = "", confirm: bool = False) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"mode": mode}
+        if bundle:
+            payload["bundle"] = bundle
+        if confirm:
+            payload["confirm"] = True
+        return await self._post("/session/set-mode", json_data=payload)
+
     async def annotate_session(self, label: str, note: str = "", author: str = "mcp_remote") -> Dict[str, Any]:
         payload = {"label": label, "note": note, "author": author}
         return await self._post("/session/annotate", json_data=payload)
