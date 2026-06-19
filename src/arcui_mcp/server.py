@@ -112,9 +112,14 @@ async def timemachine_forecast(tag: str, lookahead_seconds: float) -> Dict[str, 
     return await bridge.timemachine_forecast(tag, lookahead_seconds)
 
 @mcp.tool()
-async def timemachine_load_session(path: str) -> Dict[str, Any]:
-    """Dynamically load a session bundle (.ndjson) into the TimeMachine for playback."""
-    return await bridge.timemachine_load_session(path)
+async def timemachine_load_session(path: str = "", session_id: str = "") -> Dict[str, Any]:
+    """Load a recorded session into the TimeMachine for playback. Prefer session_id (from list_sessions); path is an explicit .ndjson fallback."""
+    return await bridge.timemachine_load_session(path=path, session_id=session_id)
+
+@mcp.tool()
+async def list_sessions() -> Dict[str, Any]:
+    """List recorded sessions on the device (newest first) with human labels and ids — use this to pick which session to replay, instead of a raw path."""
+    return await bridge.list_sessions()
 
 @mcp.tool()
 async def timemachine_fork() -> Dict[str, Any]:

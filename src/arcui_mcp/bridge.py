@@ -146,8 +146,17 @@ class ArcUIBridge:
     async def timemachine_forecast(self, tag: str, lookahead_seconds: float) -> Dict[str, Any]:
         return await self._post("/timemachine/forecast", json_data={"tag": tag, "lookahead_seconds": lookahead_seconds})
 
-    async def timemachine_load_session(self, path: str) -> Dict[str, Any]:
-        return await self._post("/timemachine/load", json_data={"path": path})
+    async def timemachine_load_session(self, path: str = "", session_id: str = "") -> Dict[str, Any]:
+        payload: Dict[str, Any] = {}
+        if session_id:
+            payload["session_id"] = session_id
+        elif path:
+            payload["path"] = path
+        return await self._post("/timemachine/load", json_data=payload)
+
+    async def list_sessions(self) -> Dict[str, Any]:
+        """Recorded-session catalog from the device (GET /mcp/sessions)."""
+        return await self._get("/sessions")
 
     async def timemachine_fork(self) -> Dict[str, Any]:
         return await self._post("/timemachine/fork")
