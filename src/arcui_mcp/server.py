@@ -127,9 +127,9 @@ async def timemachine_fork() -> Dict[str, Any]:
     Branch a new live session from the current TimeMachine playback head.
 
     Pauses playback, switches the scene to Training mode, starts a fresh
-    Session, and disconnects the TimeMachine provider so subsequent
-    widget / inject_event / MCP writes are not overwritten by the next
-    playback frame.
+    Session, and switches the TimeMachine provider into shadow-compare mode
+    (releasing the replay lock) so subsequent widget / inject_event / MCP
+    writes are not overwritten by the next playback frame.
 
     The new session is marked as a fork with structured provenance:
     parent_session_id (the loaded bundle id) and fork_time_seconds (the
