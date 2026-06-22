@@ -7,7 +7,22 @@ from .bridge import bridge
 from . import knowledge
 
 # Create the FastMCP server
-mcp = FastMCP("ArcUI Spatial Digital Twin Engine")
+mcp = FastMCP(
+    "ArcUI Spatial Digital Twin Engine",
+    instructions=(
+        "ArcUI runs a governed live spatial digital twin: sensors and values, "
+        "alarms, training sessions, cross-session handover notes, and a "
+        "TimeMachine that replays recorded sessions. Use these tools whenever the "
+        "user asks to message a trainee, generate an operational report, check "
+        "system health, read or set a value, trigger or review alarms, "
+        "start/stop/annotate a training session, replay or scrub a recording, "
+        "switch operational mode (live/training/replay), or export a session for "
+        "data science. Prefer acting over asking: every parameter that is not "
+        "given has a sensible default, so call the matching tool directly and "
+        "only ask the user back when a genuinely required field (such as the "
+        "message text) is missing."
+    ),
+)
 
 # ==========================================
 # OPERATIONS TOOLS
@@ -63,18 +78,23 @@ async def trigger_alarm(
 @mcp.tool()
 async def get_system_health() -> Dict[str, Any]:
     """
-    Return the overall system health report: provider connectivity, uptime, tag count, warnings.
-    Status is one of 'healthy' | 'degraded' | 'critical'.
-    Use this to answer questions about the reliability or stability of the system.
+    Return the system's HEALTH/status only: provider connectivity, uptime, tag
+    count, warnings. Status is one of 'healthy' | 'degraded' | 'critical'.
+    Use when the user asks "is the system ok/healthy", "what's the status",
+    "any connectivity problems". For a full readable report with values and
+    alarms, use generate_report instead.
     """
     return await bridge.get_system_health()
 
 @mcp.tool()
 async def generate_report(report_type: str = "on-demand", requested_by: str = "mcp") -> Dict[str, Any]:
     """
-    Build a structured operational report snapshot (tag values, active alarms, recent history, health).
-    Returns the data package plus a ready-to-use prompt string that an LLM can turn into a narrative report.
-    Use this when the user asks for a shift summary, incident report, or operational brief.
+    Build an operational REPORT the user can read: a snapshot of tag values,
+    active alarms, recent history and health, plus a ready-to-narrate prompt
+    string an LLM can turn into prose.
+    Use when the user asks for a "report", "system report", "shift summary",
+    "incident report", or "operational brief". For just the up/down reliability
+    status, use get_system_health instead.
     """
     return await bridge.generate_report(report_type=report_type, requested_by=requested_by)
 
@@ -93,22 +113,22 @@ async def get_provenance() -> Dict[str, Any]:
 
 @mcp.tool()
 async def timemachine_play() -> Dict[str, Any]:
-    """Resume playback of historical telemetry in the TimeMachine."""
+    """Play/resume the loaded recording in Session Replay. Use when the user says "play the replay", "resume playback", "press play"."""
     return await bridge.timemachine_play()
 
 @mcp.tool()
 async def timemachine_pause() -> Dict[str, Any]:
-    """Pause playback of historical telemetry in the TimeMachine."""
+    """Pause the recording in Session Replay. Use when the user says "pause", "hold the replay", "freeze it here"."""
     return await bridge.timemachine_pause()
 
 @mcp.tool()
 async def timemachine_seek(target_time: float) -> Dict[str, Any]:
-    """Jump to a specific time (in seconds) in the TimeMachine simulation."""
+    """Jump the replay playhead to a time in seconds. Use when the user says "go to 30 seconds", "skip to 1:20", "scrub to the start". target_time is seconds from the start."""
     return await bridge.timemachine_seek(target_time)
 
 @mcp.tool()
 async def timemachine_forecast(tag: str, lookahead_seconds: float) -> Dict[str, Any]:
-    """Predict the future value of a tag using the pre-loaded TimeMachine scenario data."""
+    """Predict a tag's value a few seconds ahead from the loaded recording. Use when the user asks "where is X heading", "what will the pressure be in 10 seconds"."""
     return await bridge.timemachine_forecast(tag, lookahead_seconds)
 
 @mcp.tool()
@@ -179,42 +199,42 @@ async def create_scenario(
 
 @mcp.tool()
 async def start_scenario(scenario_id: str) -> Dict[str, Any]:
-    """Begin playback of a registered scenario. Pair with 'list_scenarios' to discover available ids."""
+    """Start a training scenario by id. Use when the user says "run the X scenario", "start the leak drill", "launch scenario …". Call list_scenarios first to discover available ids."""
     return await bridge.start_scenario(scenario_id)
 
 @mcp.tool()
 async def list_scenarios() -> Dict[str, Any]:
-    """Enumerate every scenario currently registered in the ArcUI bridge."""
+    """List the training scenarios available to run. Use when the user asks "what scenarios are there", "which drills can I run", or before start_scenario to find an id."""
     return await bridge.list_scenarios()
 
 @mcp.tool()
 async def inject_event(tag_key: str, value_type: str, raw_value: str) -> Dict[str, Any]:
-    """Write a single value to a DataStore tag during a live training session."""
+    """Set/force a tag's value during a training session — the instructor injecting a condition. Use when the user says "set the pressure to 80", "force the pump off", "inject a fault on X". value_type is the value's type (e.g. float, int, bool, string)."""
     return await bridge.inject_event(tag_key, value_type, raw_value)
 
 @mcp.tool()
 async def evaluate_session() -> Dict[str, Any]:
-    """Read the active TrainingSession's chronological record: alarm activations, acknowledgements, tag changes, instructor messages, and ARIA answer ratings (helpful / needs-work)."""
+    """Read the active session's timeline so far: alarms raised and acknowledged, value changes, instructor messages, and answer ratings (helpful / needs-work). Use when the user asks "how is the trainee doing", "what's happened this session", "review the run so far"."""
     return await bridge.evaluate_session()
 
 @mcp.tool()
 async def send_instructor_message(text: str, instructor_name: str = "AI Instructor") -> Dict[str, Any]:
-    """Push a coaching message from the AI into the user's XR chat."""
+    """Send a message to the trainee — it appears in their in-headset ARIA chat. Use when the user wants to coach, prompt, warn, or tell the trainee/student/operator something: "send a message to the trainee", "tell them to check the pump", "warn the trainee about the pressure". text is the message; instructor_name only overrides the sender label."""
     return await bridge.send_instructor_message(text, instructor_name)
 
 @mcp.tool()
 async def start_session(procedure: str = "") -> Dict[str, Any]:
-    """Begin a new ArcUI TrainingSession on the running Unity scene."""
+    """Start a new training session/run — begins recording the timeline for later review. Use when the user says "start a session", "begin training", "start recording this run". Optional procedure names what is being practiced (e.g. "startup", "leak response")."""
     return await bridge.start_session(procedure)
 
 @mcp.tool()
 async def end_session() -> Dict[str, Any]:
-    """Stop the active ArcUI TrainingSession."""
+    """Stop the active training session/run (finalizes it so it can be replayed or exported). Use when the user says "end the session", "stop training", "finish/close this run"."""
     return await bridge.end_session()
 
 @mcp.tool()
 async def annotate_session(label: str, note: str = "", author: str = "mcp_remote") -> Dict[str, Any]:
-    """Mark a meaningful moment on the active TrainingSession with a short label and optional free-form note."""
+    """Bookmark a meaningful moment on the active session with a short label (and optional note). Use when the user says "mark this", "note that the trainee missed the alarm", "bookmark this moment". label is the short title; note is optional detail."""
     return await bridge.annotate_session(label, note, author)
 
 @mcp.tool()
